@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>術科評分</title>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+<script src="firebase-config.js"></script>
+<style id="nav-css"></style>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@500;700&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0d1117;--s:#161b22;--s2:#21262d;--b:#30363d;--ac:#58a6ff;--ac2:#bc8cff;--g:#3fb950;--y:#e3b341;--r:#f85149;--t:#e6edf3;--m:#8b949e}
+body{font-family:'Noto Sans TC',sans-serif;background:var(--bg);color:var(--t);min-height:100vh}
+
+/* Login */
+.lw{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}
+.lc{background:var(--s);border:1px solid var(--b);border-radius:24px;padding:40px;width:100%;max-width:380px;text-align:center}
+.lc .ico{font-size:52px;margin-bottom:14px}
+.lc h1{font-size:20px;font-weight:700;color:var(--ac);margin-bottom:6px}
+.lc p{color:var(--m);font-size:13px;margin-bottom:24px;line-height:1.6}
+.lc a{color:var(--ac);font-size:12px;display:block;margin-top:14px;text-decoration:none}
+.pw-inp{width:100%;background:var(--s2);border:1px solid var(--b);border-radius:10px;padding:12px 16px;color:var(--t);font-size:18px;font-family:'JetBrains Mono',monospace;outline:none;text-align:center;letter-spacing:.3em}
+.pw-inp:focus{border-color:var(--ac)}
+.btn-login{width:100%;background:var(--ac);color:#000;border:none;border-radius:10px;padding:12px;font-size:15px;font-weight:700;cursor:pointer;margin-top:12px;font-family:inherit}
+
+/* App layout */
+.app-wrap{display:grid;grid-template-columns:260px 1fr;height:calc(100vh - 90px)}
+.topbar{background:var(--s);border-bottom:1px solid var(--b);padding:10px 16px;display:flex;align-items:center;justify-content:space-between}
+.av{width:32px;height:32px;border-radius:50%;background:var(--ac2);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff}
+.live-dot{width:6px;height:6px;border-radius:50%;background:var(--g);animation:ld 2s infinite;display:inline-block}
+@keyframes ld{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* Sidebar */
+.sidebar{background:var(--s);border-right:1px solid var(--b);display:flex;flex-direction:column;overflow:hidden;height:100%}
+.sb-hdr{padding:12px 14px;border-bottom:1px solid var(--b);flex-shrink:0}
+.sb-room-lbl{font-size:14px;font-weight:700;color:var(--ac2)}
+.sb-section{display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden}
+.sb-sec-title{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:8px 12px 4px;flex-shrink:0}
+.sb-sec-title.wait{color:var(--y)}
+.sb-sec-title.done{color:var(--g)}
+.sb-list{flex:1;overflow-y:auto;padding:4px 8px 8px}
+.sb-divider{height:1px;background:var(--b);flex-shrink:0}
+
+/* Queue item */
+.qi{border-radius:8px;padding:9px 10px;margin-bottom:5px;cursor:pointer;border:2px solid transparent;transition:.1s}
+.qi:hover{border-color:var(--b)}
+.qi.cur{background:rgba(63,185,80,.08);border-color:rgba(63,185,80,.45)}
+.qi.wait{background:var(--s2)}
+.qi.done{opacity:.6}
+.qi-badge{font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;display:block;margin-bottom:2px}
+.qi.cur .qi-badge{color:var(--g)}
+.qi.wait .qi-badge{color:var(--y)}
+.qi.done .qi-badge{color:var(--m)}
+.qi-name{font-size:13px;font-weight:700}
+.qi-sub{font-size:10px;color:var(--m);margin-top:1px;line-height:1.4}
+.qi-score{font-size:10px;color:var(--g);font-family:'JetBrains Mono',monospace;margin-top:2px}
+.qi-new::after{content:'NEW';background:var(--r);color:#fff;font-size:8px;padding:1px 4px;border-radius:3px;font-weight:700;margin-left:5px;vertical-align:middle}
+
+/* Main */
+.main{overflow-y:auto;padding:20px;height:100%}
+.sc{background:var(--s);border:1px solid var(--b);border-radius:14px;padding:22px;margin-bottom:14px}
+.sc.glow{border-color:var(--g);animation:glow 3s ease-in-out infinite}
+@keyframes glow{0%,100%{border-color:rgba(63,185,80,.3)}50%{border-color:rgba(63,185,80,.7)}}
+.cand-lbl{font-size:10px;color:var(--g);text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px;font-weight:600}
+.cand-name{font-size:26px;font-weight:700;margin-bottom:2px}
+.cand-no{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--m);margin-bottom:14px}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.chip{background:var(--s2);border:1px solid var(--b);border-radius:8px;padding:8px 12px;flex:1}
+.chip .cl{font-size:10px;color:var(--m);display:block;margin-bottom:2px}
+.chip .cv{font-size:13px;font-weight:600}
+.score-area{background:var(--s2);border-radius:10px;padding:14px;margin-bottom:14px}
+.score-area p{font-size:13px;color:var(--m);margin-bottom:10px}
+.score-row{display:flex;align-items:center;gap:12px}
+.snum{font-family:'JetBrains Mono',monospace;font-size:24px;font-weight:700;width:100px;text-align:center;background:var(--s);border:2px solid var(--b);border-radius:10px;padding:10px;color:var(--t);outline:none}
+.snum:focus{border-color:var(--ac)}
+.snum::-webkit-outer-spin-button,.snum::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.snum[type=number]{-moz-appearance:textfield}
+.btn-submit{width:100%;background:var(--g);color:#fff;border:none;border-radius:10px;padding:15px;font-size:17px;font-weight:700;cursor:pointer;font-family:inherit}
+.btn-edit{width:100%;background:transparent;border:1px solid var(--b);color:var(--m);border-radius:10px;padding:9px;font-size:13px;cursor:pointer;font-family:inherit;margin-top:8px}
+.btn-edit:hover{border-color:var(--ac);color:var(--ac)}
+.scored-box{background:rgba(63,185,80,.07);border:1px solid rgba(63,185,80,.2);border-radius:10px;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.scored-val{font-family:'JetBrains Mono',monospace;font-size:26px;font-weight:700;color:var(--g)}
+.wait-card{background:var(--s);border:1px solid var(--b);border-radius:14px;padding:56px 24px;text-align:center}
+.wait-card .ico{font-size:40px;margin-bottom:12px}
+.wait-card p{color:var(--m);font-size:14px;line-height:1.7}
+
+@media(max-width:680px){.app-wrap{grid-template-columns:1fr;height:auto}.sidebar{max-height:220px;border-right:none;border-bottom:1px solid var(--b)}}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--s2);border:1px solid var(--b);border-radius:12px;padding:12px 22px;font-size:14px;font-weight:600;opacity:0;transition:opacity .3s;pointer-events:none;z-index:999;white-space:nowrap}
+.toast.show{opacity:1}
+.toast.ok{border-color:var(--g);color:var(--g)}
+.toast.warn{border-color:var(--y);color:var(--y)}
+.toast.err{border-color:var(--r);color:var(--r)}
+</style>
+</head>
+<body>
+
+<!-- Login -->
+<div class="lw" id="LP">
+  <div class="lc">
+    <div class="ico">✏️</div>
+    <h1>術科評分</h1>
+    <p>CM216 ／ CM214 ／ CM212<br>請輸入您的個人密碼登入</p>
+    <input class="pw-inp" type="password" id="pw" placeholder="輸入密碼" onkeydown="if(event.key==='Enter')doLogin()">
+    <div id="err" style="color:var(--r);font-size:12px;margin-top:8px;display:none">密碼錯誤</div>
+    <button class="btn-login" onclick="doLogin()">登入</button>
+    <a href="index.html">← 返回管理後台</a>
+  </div>
+</div>
+
+<!-- App -->
+<div id="APP" style="display:none">
+  <div id="NAV"></div>
+  <div class="topbar">
+    <div style="display:flex;align-items:center;gap:10px">
+      <div class="av" id="h-av">?</div>
+      <div>
+        <div style="font-size:13px;font-weight:600" id="h-name">—</div>
+        <div style="font-size:11px;color:var(--m)" id="h-room">—</div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <span class="live-dot"></span>
+      <span style="font-size:11px;color:var(--m)">即時同步</span>
+      <button onclick="doLogout()" style="background:transparent;border:1px solid var(--b);color:var(--m);border-radius:7px;padding:4px 10px;cursor:pointer;font-size:11px;font-family:inherit">登出</button>
+    </div>
+  </div>
+
+  <div class="app-wrap">
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <div class="sb-hdr">
+        <div style="font-size:10px;color:var(--m);text-transform:uppercase;letter-spacing:.1em;margin-bottom:2px">候考佇列</div>
+        <div class="sb-room-lbl" id="sb-room">—</div>
+      </div>
+      <!-- 上：等待 -->
+      <div class="sb-section" style="flex:1.2">
+        <div class="sb-sec-title wait" id="lbl-wait">⏳ 等待評分</div>
+        <div class="sb-list" id="list-wait">
+          <p style="color:var(--m);font-size:12px;text-align:center;padding:16px 0">等待考生進入...</p>
+        </div>
+      </div>
+      <div class="sb-divider"></div>
+      <!-- 下：已完成 -->
+      <div class="sb-section" style="flex:1">
+        <div class="sb-sec-title done" id="lbl-done">✅ 已完成</div>
+        <div class="sb-list" id="list-done">
+          <p style="color:var(--m);font-size:12px;text-align:center;padding:16px 0">尚無已完成</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main panel -->
+    <div class="main" id="main-panel">
+      <div class="wait-card">
+        <div class="ico">⏳</div>
+        <p>等待考生進入<br>工作人員掃碼後自動顯示</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.getElementById('nav-css').textContent = NAV_CSS;
+
+// ── Firebase ──────────────────────────────────────────
+firebase.initializeApp(FIREBASE_CONFIG);
+const db = firebase.database();
+
+// ── State ─────────────────────────────────────────────
+let teacher = null;
+let queueData = {};      // practicalQueue/<room>  key=candidateId
+let candidateData = {};  // candidates              key=candidateId
+let selCid = null;       // currently shown candidate id
+let newCids = new Set(); // newly arrived (for NEW badge)
+
+// ── Login / Logout ────────────────────────────────────
+function doLogin() {
+  const pw = document.getElementById('pw').value.trim();
+  document.getElementById('err').style.display = 'none';
+
+  // 唯一驗證來源：Firebase teachers 節點，不使用靜態 fallback
+  db.ref('teachers').orderByChild('password').equalTo(pw).once('value').then(snap => {
+    const data = snap.val();
+    if (data) {
+      const t = Object.values(data).find(t => t.type === 'practical');
+      if (t) { startSession(t); return; }
+    }
+    document.getElementById('err').style.display = 'block';
+  }).catch(() => {
+    document.getElementById('err').style.display = 'block';
+  });
+}
+
+function startSession(t) {
+  teacher = { ...t };
+  document.getElementById('LP').style.display = 'none';
+  document.getElementById('APP').style.display = 'block';
+  document.getElementById('NAV').innerHTML = buildNav('practical', t.name + ' 委員', 'doLogout()');
+  document.getElementById('h-av').textContent = t.name[0];
+  document.getElementById('h-name').textContent = t.name + ' 委員';
+  document.getElementById('h-room').textContent = t.room + ' 術科';
+  document.getElementById('sb-room').textContent = t.room;
+  document.getElementById('err').style.display = 'none';
+  startListening();
+}
+
+function doLogout() {
+  stopListening();
+  teacher = null; queueData = {}; candidateData = {}; selCid = null; newCids.clear();
+  document.getElementById('APP').style.display = 'none';
+  document.getElementById('LP').style.display = 'flex';
+  document.getElementById('pw').value = '';
+}
+
+// ── Firebase listeners ────────────────────────────────
+let unsubQueue = null, unsubCandidates = null;
+
+function startListening() {
+  const qRef = db.ref('practicalQueue/' + teacher.room);
+  unsubQueue = qRef.on('value', snap => {
+    const data = snap.val() || {};
+    const newIds = Object.keys(data).filter(cid => !queueData[cid]);
+    newIds.forEach(cid => newCids.add(cid));
+    queueData = data;
+
+    // 對佇列中尚未載入的考生，按需讀取其 candidates 資料
+    const missingIds = Object.keys(data).filter(cid => !candidateData[cid]);
+    if (missingIds.length > 0) {
+      Promise.all(
+        missingIds.map(cid =>
+          db.ref('candidates/' + cid).once('value').then(s => ({ cid, val: s.val() }))
+        )
+      ).then(results => {
+        results.forEach(({ cid, val }) => { if (val) candidateData[cid] = val; });
+        cleanOrphanQueue();
+        refreshUI();
+      });
+    } else {
+      if (Object.keys(candidateData).length > 0) cleanOrphanQueue();
+      refreshUI();
+    }
+  });
+
+  // candidates 只監聽已在佇列中的考生的分數異動
+  // 使用 child_changed 取代全量 value 監聽
+  unsubCandidates = db.ref('candidates').on('child_changed', snap => {
+    if (snap.key && queueData[snap.key]) {
+      candidateData[snap.key] = snap.val();
+      refreshUI();
+    }
+  });
+}
+
+// 清除佇列中已不存在的考生（從 Firebase 和本地同時移除）
+function cleanOrphanQueue() {
+  Object.keys(queueData).forEach(cid => {
+    if (!candidateData[cid]) {
+      db.ref('practicalQueue/' + teacher.room + '/' + cid).remove();
+      delete queueData[cid];
+      newCids.delete(cid);
+      if (selCid === cid) selCid = null;
+    }
+  });
+}
+
+function stopListening() {
+  if (unsubQueue) { db.ref('practicalQueue/' + (teacher?.room || '')).off('value', unsubQueue); unsubQueue = null; }
+  if (unsubCandidates) { db.ref('candidates').off('child_changed', unsubCandidates); unsubCandidates = null; }
+  candidateData = {};
+}
+
+// ── Core: get my score for a candidate ───────────────
+function getMyScore(cid) {
+  if (!teacher || !candidateData[cid]) return null;
+  const scores = candidateData[cid].practicalScores;
+  if (!scores) return null;
+  const v = scores[teacher.name];
+  return (v !== null && v !== undefined && v !== '') ? Number(v) : null;
+}
+
+// ── Core: sorted queue entries (only candidates that still exist) ──
+function sortedQueue() {
+  return Object.entries(queueData)
+    .filter(([cid]) => !!candidateData[cid]) // 過濾已刪除的考生
+    .sort((a, b) => (a[1].assignedAt || 0) - (b[1].assignedAt || 0));
+}
+
+// ── Core: pick which candidate to show ───────────────
+function pickCurrent() {
+  const all = sortedQueue();
+  if (!all.length) return null;
+
+  // If current selection is still valid and unscored → keep it
+  if (selCid && queueData[selCid] && getMyScore(selCid) === null) return selCid;
+
+  // Find oldest (first in) unscored
+  const unscored = all.filter(([cid]) => getMyScore(cid) === null);
+  if (unscored.length) return unscored[0][0];
+
+  // All scored → keep selCid if valid, else null
+  if (selCid && queueData[selCid]) return selCid;
+  return null;
+}
+
+// ── Render ────────────────────────────────────────────
+function refreshUI() {
+  selCid = pickCurrent();
+  renderSidebar();
+  renderMain();
+}
+
+function renderSidebar() {
+  const all = sortedQueue();
+  const waitList = all.filter(([cid]) => getMyScore(cid) === null);
+  const doneList = all.filter(([cid]) => getMyScore(cid) !== null);
+
+  document.getElementById('lbl-wait').textContent =
+    `⏳ 等待評分${waitList.length ? '（' + waitList.length + '）' : ''}`;
+  document.getElementById('lbl-done').textContent =
+    `✅ 已完成${doneList.length ? '（' + doneList.length + '）' : ''}`;
+
+  // Wait list
+  const waitEl = document.getElementById('list-wait');
+  if (!waitList.length) {
+    waitEl.innerHTML = '<p style="color:var(--m);font-size:12px;text-align:center;padding:16px 0">無等待考生</p>';
+  } else {
+    waitEl.innerHTML = waitList.map(([cid, item]) => {
+      const isCur = cid === selCid;
+      const isNew = newCids.has(cid);
+      return `<div class="qi ${isCur ? 'cur' : 'wait'}" onclick="userSelect('${cid}')">
+        <span class="qi-badge">${isCur ? '▶ 目前' : '等候中'}${isNew ? '<span class="qi-new"></span>' : ''}</span>
+        <div class="qi-name">${item.name}</div>
+        <div class="qi-sub">${item.school || ''}${item.dept ? '\n' + item.dept : ''}</div>
+      </div>`;
+    }).join('');
+  }
+
+  // Done list (newest first)
+  const doneEl = document.getElementById('list-done');
+  if (!doneList.length) {
+    doneEl.innerHTML = '<p style="color:var(--m);font-size:12px;text-align:center;padding:16px 0">尚無已完成</p>';
+  } else {
+    doneEl.innerHTML = [...doneList].reverse().map(([cid, item]) => {
+      const isCur = cid === selCid;
+      const sc = getMyScore(cid);
+      return `<div class="qi done${isCur ? ' cur' : ''}" onclick="userSelect('${cid}')">
+        <span class="qi-badge">已完成</span>
+        <div class="qi-name">${item.name}</div>
+        <div class="qi-sub">${item.school || ''}${item.dept ? '\n' + item.dept : ''}</div>
+        <div class="qi-score">✓ 已評：${sc}分</div>
+      </div>`;
+    }).join('');
+  }
+}
+
+function renderMain() {
+  const el = document.getElementById('main-panel');
+
+  if (!selCid || !queueData[selCid]) {
+    const all = sortedQueue();
+    if (all.length && all.every(([cid]) => getMyScore(cid) !== null)) {
+      el.innerHTML = `<div class="wait-card"><div class="ico">✅</div>
+        <p style="color:var(--g);font-weight:600;font-size:16px">本場次全部評分完成！</p>
+        <p style="margin-top:8px">等待下一位考生進入...</p></div>`;
+    } else {
+      el.innerHTML = `<div class="wait-card"><div class="ico">⏳</div>
+        <p>等待考生進入<br>工作人員在門口掃碼後<br>考生資訊將自動出現在左側</p></div>`;
+    }
+    return;
+  }
+
+  const item = queueData[selCid];
+  const ms = getMyScore(selCid);
+
+  if (ms === null) {
+    el.innerHTML = `
+      <div class="sc glow">
+        <div class="cand-lbl">🟢 目前評分考生</div>
+        <div class="cand-name">${item.name}</div>
+        <div class="cand-no">序號：${item.regNo}</div>
+        <div class="chips">
+          <div class="chip"><span class="cl">就讀學校</span><span class="cv">${item.school || '—'}</span></div>
+          <div class="chip"><span class="cl">畢業系別</span><span class="cv">${item.dept || '—'}</span></div>
+        </div>
+        <div class="score-area">
+          <p>請輸入術科分數（0–100）</p>
+          <div class="score-row">
+            <input type="number" class="snum" id="sinp" min="0" max="100" placeholder="—"
+              oninput="let v=parseInt(this.value);if(!isNaN(v)){if(v>100)this.value=100;if(v<0)this.value=0;}"
+              onkeydown="if(event.key==='Enter')submitScore()">
+            <span style="color:var(--m);font-size:13px">0–100 分</span>
+          </div>
+        </div>
+        <button class="btn-submit" onclick="submitScore()">✓ 確認送出分數</button>
+      </div>`;
+    setTimeout(() => { const i = document.getElementById('sinp'); if (i) i.focus(); }, 60);
+  } else {
+    el.innerHTML = `
+      <div class="sc">
+        <div class="cand-lbl" style="color:var(--g)">✅ 已完成評分</div>
+        <div class="cand-name">${item.name}</div>
+        <div class="cand-no">序號：${item.regNo}</div>
+        <div class="chips">
+          <div class="chip"><span class="cl">就讀學校</span><span class="cv">${item.school || '—'}</span></div>
+          <div class="chip"><span class="cl">畢業系別</span><span class="cv">${item.dept || '—'}</span></div>
+        </div>
+        <div class="scored-box">
+          <span style="color:var(--m);font-size:13px">您的評分</span>
+          <span class="scored-val">${ms} 分</span>
+        </div>
+        <button class="btn-edit" onclick="editScore()">修改分數</button>
+      </div>`;
+  }
+}
+
+// ── User actions ──────────────────────────────────────
+function userSelect(cid) {
+  selCid = cid;
+  newCids.delete(cid);
+  renderSidebar();
+  renderMain();
+}
+
+function submitScore() {
+  const inp = document.getElementById('sinp');
+  const v = parseInt(inp?.value);
+  if (isNaN(v) || v < 0 || v > 100) { alert('請輸入 0 到 100 的整數'); return; }
+  const btn = document.querySelector('.btn-submit');
+  if (btn) { btn.disabled = true; btn.textContent = '送出中...'; }
+  db.ref('candidates/' + selCid + '/practicalScores/' + teacher.name).set(v)
+    .then(() => {
+      // Firebase listener 自動觸發 refreshUI
+    })
+    .catch(() => {
+      if (btn) { btn.disabled = false; btn.textContent = '✓ 確認送出分數'; }
+      showToast('❌ 評分失敗，請確認網路後重試', 'err');
+    });
+}
+
+function editScore() {
+  db.ref('candidates/' + selCid + '/practicalScores/' + teacher.name).remove();
+}
+
+let _toastTimer = null;
+function showToast(msg, type) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast show ' + (type || 'ok');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => { el.className = 'toast'; }, 2500);
+}
+</script>
+<div class="toast" id="toast"></div>
+</body>
+</html>

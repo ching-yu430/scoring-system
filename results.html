@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>即時成績總表</title>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+<script src="firebase-config.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#070d1a;--s:#0e1628;--s2:#162039;--b:#1e2d4f;--ac:#60a5fa;--ac2:#a78bfa;--g:#4ade80;--y:#facc15;--r:#f87171;--t:#dbeafe;--m:#6b7fa8}
+body{font-family:'Noto Sans TC',sans-serif;background:var(--bg);color:var(--t);min-height:100vh}
+</style>
+<style id="nav-css"></style>
+<style>
+.wrap{max-width:1300px;margin:0 auto;padding:20px 16px}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+.st{background:var(--s);border:1px solid var(--b);border-radius:12px;padding:16px;text-align:center}
+.st .n{font-size:26px;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--ac)}
+.st .l{font-size:11px;color:var(--m);margin-top:3px}
+.toolbar{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
+.srch{flex:1;min-width:140px;background:var(--s);border:1px solid var(--b);border-radius:8px;padding:9px 13px;color:var(--t);font-size:13px;font-family:inherit;outline:none}
+.srch:focus{border-color:var(--ac)}
+.ftab{padding:6px 14px;border-radius:18px;background:var(--s);border:1px solid var(--b);color:var(--m);cursor:pointer;font-size:11px;font-weight:500;transition:.12s}
+.ftab.on{background:var(--ac);color:#000;border-color:var(--ac)}
+.btn{cursor:pointer;font-family:inherit;font-weight:500;background:var(--s);border:1px solid var(--b);color:var(--t);border-radius:8px;padding:7px 14px;font-size:12px;transition:.12s}
+.btn:hover{border-color:var(--ac);color:var(--ac)}
+.tbl-wrap{background:var(--s);border:1px solid var(--b);border-radius:14px;overflow:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead{background:var(--s2)}
+th{padding:10px 14px;text-align:left;font-size:10px;color:var(--m);text-transform:uppercase;letter-spacing:.07em;font-weight:500;border-bottom:1px solid var(--b);cursor:pointer;white-space:nowrap;user-select:none}
+th:hover{color:var(--ac)}
+th.no-sort{cursor:default}
+th.no-sort:hover{color:var(--m)}
+td{padding:10px 14px;border-bottom:1px solid rgba(30,45,79,.5);vertical-align:middle;white-space:nowrap}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(96,165,250,.04)}
+.mono{font-family:'JetBrains Mono',monospace;font-size:12px}
+.badge{font-size:11px;padding:3px 8px;border-radius:8px;font-weight:600;display:inline-block}
+.bdg{background:rgba(74,222,128,.1);color:var(--g)}
+.bdy{background:rgba(250,204,21,.08);color:var(--y)}
+.bdm{background:var(--s2);color:var(--m)}
+.bdb{background:rgba(96,165,250,.1);color:var(--ac)}
+.score{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:13px}
+.score-avg{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:14px}
+.sg{color:var(--g)}.sy{color:var(--y)}.sr{color:var(--r)}.sm{color:var(--m)}
+/* 個別分數 cell */
+.score-detail{display:flex;flex-direction:column;gap:2px}
+.score-item{font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--t)}
+.score-item .tname{font-size:10px;color:var(--m);font-family:'Noto Sans TC',sans-serif}
+.score-pending{font-size:11px;color:var(--m)}
+/* 平均欄 */
+.avg-cell{text-align:center}
+.bar-wrap{display:flex;flex-direction:column;align-items:center;gap:4px}
+.bar{height:4px;border-radius:3px;background:var(--b);width:52px;overflow:hidden}
+.bar-fill{height:100%;border-radius:3px}
+/* 分隔線 */
+th.sep,td.sep{border-left:1px solid var(--b)}
+.no-data{text-align:center;padding:56px;color:var(--m)}
+@media(max-width:700px){.stats{grid-template-columns:repeat(2,1fr)}.toolbar{flex-direction:column}}
+.lw{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}
+.lc{background:var(--s);border:1px solid var(--b);border-radius:20px;padding:36px 28px;width:100%;max-width:380px;text-align:center}
+.lc .ico{font-size:48px;margin-bottom:12px}
+.lc h1{font-size:20px;font-weight:700;color:var(--ac);margin-bottom:6px}
+.lc p{color:var(--m);font-size:13px;margin-bottom:22px;line-height:1.6}
+.pw-inp{width:100%;background:var(--s2);border:1px solid var(--b);border-radius:8px;padding:11px 14px;color:var(--t);font-size:15px;font-family:inherit;outline:none;text-align:center;letter-spacing:.15em}
+.pw-inp:focus{border-color:var(--ac)}
+.btn-login{width:100%;background:var(--ac);color:#000;border:none;border-radius:10px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:10px;transition:.12s}
+.btn-login:hover{filter:brightness(1.1)}
+.err-login{color:var(--r);font-size:12px;margin-top:8px;display:none}
+</style>
+</head>
+<body>
+
+<!-- 登入頁 -->
+<div class="lw" id="LP">
+  <div class="lc">
+    <div class="ico">📊</div>
+    <h1>成績總表</h1>
+    <p>僅限管理員查看<br>請輸入管理員密碼</p>
+    <input class="pw-inp" type="password" id="pw" placeholder="輸入密碼" onkeydown="if(event.key==='Enter')doLogin()">
+    <div class="err-login" id="err-login">密碼錯誤，請向管理員確認</div>
+    <button class="btn-login" onclick="doLogin()">登入</button>
+    <a href="index.html" style="display:block;margin-top:14px;font-size:12px;color:var(--m);text-decoration:none">← 返回管理後台</a>
+  </div>
+</div>
+
+<!-- 主畫面 -->
+<div id="APP" style="display:none">
+<div id="NAV"></div>
+<div class="wrap">
+  <div class="stats">
+    <div class="st"><div class="n" id="s0">0</div><div class="l">總考生</div></div>
+    <div class="st"><div class="n" id="s1">0</div><div class="l">已報到</div></div>
+    <div class="st"><div class="n" id="s2">0</div><div class="l">面試完成</div></div>
+    <div class="st"><div class="n" id="s3">0</div><div class="l">全部完成</div></div>
+  </div>
+
+  <div class="toolbar">
+    <input class="srch" id="srch" placeholder="🔍 搜尋考生..." oninput="render()">
+    <div class="ftab on" onclick="setF('all',this)">全部</div>
+    <div class="ftab" onclick="setF('done',this)">完整評分</div>
+    <div class="ftab" onclick="setF('partial',this)">部分評分</div>
+    <div class="ftab" onclick="setF('none',this)">未評分</div>
+    <button class="btn" onclick="exportCSV()">📤 匯出 CSV</button>
+    <button class="btn" onclick="window.print()">🖨️ 列印</button>
+  </div>
+
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr>
+        <th onclick="setSort('regNo')">序號 ↕</th>
+        <th onclick="setSort('name')">考生 ↕</th>
+        <th class="sep no-sort">面試老師1</th>
+        <th class="no-sort">面試老師2</th>
+        <th onclick="setSort('iv')">面試平均 ↕</th>
+        <th class="sep no-sort">術科老師1</th>
+        <th class="no-sort">術科老師2</th>
+        <th onclick="setSort('pr')">術科平均 ↕</th>
+        <th class="sep no-sort">教室</th>
+        <th class="no-sort">狀態</th>
+      </tr></thead>
+      <tbody id="tbody"><tr><td colspan="10" class="no-data">載入中...</td></tr></tbody>
+    </table>
+  </div>
+</div>
+</div><!-- /APP -->
+
+<script>
+document.getElementById('nav-css').textContent = NAV_CSS;
+firebase.initializeApp(FIREBASE_CONFIG);
+const db = firebase.database();
+let candidates = {}, filt = 'all', sortKey = 'regNo', sortDir = 1;
+let currentUser = null;
+
+// ── 登入（僅限管理員）────────────────────────────
+function doLogin() {
+  const pw = document.getElementById('pw').value.trim();
+  document.getElementById('err-login').style.display = 'none';
+
+  // 從 Firebase teachers 節點驗證管理員密碼，同時保留靜態 fallback
+  db.ref('teachers').orderByChild('password').equalTo(pw).once('value').then(snap => {
+    const data = snap.val();
+    const isAdmin = (data && Object.values(data).some(t => t.type === 'admin'))
+                    || TEACHERS[pw]?.type === 'admin';
+    if (isAdmin) {
+      currentUser = { name: '管理員' };
+      startApp();
+    } else {
+      document.getElementById('err-login').style.display = 'block';
+    }
+  }).catch(() => {
+    // Firebase 失敗時 fallback 靜態驗證
+    if (TEACHERS[pw]?.type === 'admin') {
+      currentUser = TEACHERS[pw];
+      startApp();
+    } else {
+      document.getElementById('err-login').style.display = 'block';
+    }
+  });
+}
+
+function startApp() {
+  document.getElementById('LP').style.display = 'none';
+  document.getElementById('APP').style.display = 'block';
+  document.getElementById('NAV').innerHTML = buildNav('results', currentUser.name, 'doLogout()');
+  db.ref('candidates').on('value', s => { candidates = s.val() || {}; updateStats(); render(); });
+}
+
+function doLogout() {
+  document.getElementById('APP').style.display = 'none';
+  document.getElementById('LP').style.display = 'flex';
+  document.getElementById('pw').value = '';
+  db.ref('candidates').off();
+  candidates = {}; currentUser = null;
+}
+
+function avg(o) {
+  if (!o) return null;
+  const v = Object.values(o).filter(x => x !== null && x !== undefined && x !== '');
+  return v.length ? v.reduce((a, b) => a + Number(b), 0) / v.length : null;
+}
+function status(c) {
+  const iv = avg(c.interviewScores) !== null, pr = avg(c.practicalScores) !== null;
+  return iv && pr ? 'done' : iv || pr ? 'partial' : 'none';
+}
+function scoreCol(v) { if (v === null) return 'sm'; return v >= 80 ? 'sg' : v >= 60 ? 'sy' : 'sr'; }
+function barColor(v) { if (v === null) return '#1e2d4f'; return v >= 80 ? '#4ade80' : v >= 60 ? '#facc15' : '#f87171'; }
+
+// 產生「分數(老師名)」格式的 cell
+function scoreDetailCell(scoresObj, index) {
+  if (!scoresObj) return '<span class="score-pending">—</span>';
+  const entries = Object.entries(scoresObj);
+  if (entries.length <= index) return '<span class="score-pending">—</span>';
+  const [tname, score] = entries[index];
+  const v = Number(score);
+  return `<span class="score ${scoreCol(v)}">${v}</span><span class="tname" style="font-size:10px;color:var(--m);font-family:'Noto Sans TC',sans-serif;margin-left:3px">(${tname})</span>`;
+}
+
+// 平均欄 cell
+function avgCell(scoresObj) {
+  const v = avg(scoresObj);
+  if (v === null) return '<span class="badge bdm">未評</span>';
+  const entries = Object.entries(scoresObj || {});
+  const pending = entries.length < 2 ? ' <span style="color:var(--y);font-size:10px">(待補)</span>' : '';
+  return `<div class="bar-wrap">
+    <div class="bar"><div class="bar-fill" style="width:${v}%;background:${barColor(v)}"></div></div>
+    <span class="score-avg ${scoreCol(v)}">${v.toFixed(1)}</span>
+  </div>${pending}`;
+}
+
+function updateStats() {
+  const list = Object.values(candidates);
+  document.getElementById('s0').textContent = list.length;
+  document.getElementById('s1').textContent = list.filter(c => c.checkedIn).length;
+  document.getElementById('s2').textContent = list.filter(c => avg(c.interviewScores) !== null).length;
+  document.getElementById('s3').textContent = list.filter(c => status(c) === 'done').length;
+}
+
+function setF(f, el) { filt = f; document.querySelectorAll('.ftab').forEach(t => t.classList.toggle('on', t === el)); render(); }
+function setSort(k) { if (sortKey === k) sortDir *= -1; else { sortKey = k; sortDir = 1; } render(); }
+
+function render() {
+  let list = Object.values(candidates).filter(c => {
+    if (!matchSearch(c, document.getElementById('srch').value)) return false;
+    const st = status(c);
+    if (filt !== 'all' && st !== filt) return false;
+    return true;
+  });
+  list.sort((a, b) => {
+    let va, vb;
+    if (sortKey === 'regNo') return String(a.regNo || '').localeCompare(String(b.regNo || '')) * sortDir;
+    if (sortKey === 'name') return (a.name || '').localeCompare(b.name || '') * sortDir;
+    if (sortKey === 'iv') { va = avg(a.interviewScores) ?? -1; vb = avg(b.interviewScores) ?? -1; }
+    if (sortKey === 'pr') { va = avg(a.practicalScores) ?? -1; vb = avg(b.practicalScores) ?? -1; }
+    return ((va ?? 0) - (vb ?? 0)) * sortDir;
+  });
+
+  const tbody = document.getElementById('tbody');
+  if (!list.length) { tbody.innerHTML = '<tr><td colspan="10" class="no-data">沒有符合的考生</td></tr>'; return; }
+
+  const st = c => status(c);
+  tbody.innerHTML = list.map(c => {
+    const s = st(c);
+    return `<tr>
+      <td class="mono">${c.regNo || ''}</td>
+      <td><strong>${c.name || ''}</strong></td>
+      <td class="sep">${scoreDetailCell(c.interviewScores, 0)}</td>
+      <td>${scoreDetailCell(c.interviewScores, 1)}</td>
+      <td class="avg-cell">${avgCell(c.interviewScores)}</td>
+      <td class="sep">${scoreDetailCell(c.practicalScores, 0)}</td>
+      <td>${scoreDetailCell(c.practicalScores, 1)}</td>
+      <td class="avg-cell">${avgCell(c.practicalScores)}</td>
+      <td class="sep">${c.assignedRoom ? `<span class="badge bdy">${c.assignedRoom}</span>` : '<span style="color:var(--m);font-size:11px">—</span>'}</td>
+      <td>${s === 'done' ? '<span class="badge bdg">完整</span>' : s === 'partial' ? '<span class="badge bdy">部分</span>' : '<span class="badge bdm">未評</span>'}</td>
+    </tr>`;
+  }).join('');
+}
+
+function exportCSV() {
+  // 欄位格式與管理後台一致：老師名稱和分數分開欄位
+  const rows = [['序號', '姓名', '畢業系別', '就讀學校', '報到',
+    '面試委員1', '面試委員2', '評分(面試委員1)', '評分(面試委員2)', '面試平均成績',
+    '術科評分委員1', '術科評分委員2', '術科成績1', '術科成績2', '術科平均成績',
+    '指派教室', '狀態']];
+
+  Object.values(candidates)
+    .sort((a, b) => String(a.regNo).localeCompare(String(b.regNo)))
+    .forEach(c => {
+      const ivEntries = Object.entries(c.interviewScores || {});
+      const prEntries = Object.entries(c.practicalScores || {});
+      const ivAvg = avg(c.interviewScores);
+      const prAvg = avg(c.practicalScores);
+
+      rows.push([
+        c.regNo,
+        c.name,
+        c.dept || '',
+        c.school || '',
+        c.checkedIn ? '已報到' : '未報到',
+        // 面試：委員名稱欄 + 分數欄
+        ivEntries[0] ? ivEntries[0][0] : '',
+        ivEntries[1] ? ivEntries[1][0] : '',
+        ivEntries[0] ? (ivEntries[0][1] !== null && ivEntries[0][1] !== undefined ? ivEntries[0][1] : 0) : 0,
+        ivEntries[1] ? (ivEntries[1][1] !== null && ivEntries[1][1] !== undefined ? ivEntries[1][1] : 0) : 0,
+        ivAvg !== null ? ivAvg.toFixed(1) : 0,
+        // 術科：委員名稱欄 + 分數欄
+        prEntries[0] ? prEntries[0][0] : '',
+        prEntries[1] ? prEntries[1][0] : '',
+        prEntries[0] ? (prEntries[0][1] !== null && prEntries[0][1] !== undefined ? prEntries[0][1] : 0) : 0,
+        prEntries[1] ? (prEntries[1][1] !== null && prEntries[1][1] !== undefined ? prEntries[1][1] : 0) : 0,
+        prAvg !== null ? prAvg.toFixed(1) : 0,
+        c.assignedRoom || '',
+        status(c) === 'done' ? '完整' : status(c) === 'partial' ? '部分' : '未評'
+      ]);
+    });
+
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,\uFEFF' + encodeURIComponent(rows.map(r => r.join(',')).join('\n'));
+  a.download = '成績總表.csv';
+  a.click();
+}
+</script>
+</body>
+</html>

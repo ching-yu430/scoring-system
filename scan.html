@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>工作人員掃碼</title>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="firebase-config.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=JetBrains+Mono:wght@500&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0d1117;--s:#161b22;--s2:#21262d;--b:#30363d;--ac:#58a6ff;--ac2:#bc8cff;--g:#3fb950;--y:#e3b341;--r:#f85149;--t:#e6edf3;--m:#8b949e}
+body{font-family:'Noto Sans TC',sans-serif;background:var(--bg);color:var(--t);min-height:100vh}
+</style>
+<style id="nav-css"></style>
+<style>
+.lw{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}
+.lc{background:var(--s);border:1px solid var(--b);border-radius:20px;padding:36px 28px;width:100%;max-width:380px;text-align:center}
+.lc .ico{font-size:48px;margin-bottom:12px}
+.lc h1{font-size:20px;font-weight:700;color:var(--ac);margin-bottom:6px}
+.lc p{color:var(--m);font-size:13px;margin-bottom:22px;line-height:1.6}
+.pw-inp{width:100%;background:var(--s2);border:1px solid var(--b);border-radius:8px;padding:11px 14px;color:var(--t);font-size:15px;font-family:inherit;outline:none;text-align:center;letter-spacing:.15em}
+.pw-inp:focus{border-color:var(--ac)}
+.btn-login{width:100%;background:var(--ac);color:#000;border:none;border-radius:10px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:10px;transition:.12s}
+.btn-login:hover{filter:brightness(1.1)}
+.err{color:var(--r);font-size:12px;margin-top:8px;display:none}
+
+.wrap{max-width:480px;margin:0 auto;padding:16px}
+.toprow{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px}
+.room-badge{display:inline-flex;align-items:center;gap:8px;background:rgba(188,140,255,.12);border:1px solid rgba(188,140,255,.3);color:var(--ac2);border-radius:20px;padding:6px 16px;font-size:14px;font-weight:700}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--g);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.card{background:var(--s);border:1px solid var(--b);border-radius:14px;padding:18px;margin-bottom:12px}
+.ch2{font-size:11px;color:var(--m);text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px}
+.mtabs{display:flex;gap:6px;margin-bottom:14px}
+.mtab{flex:1;padding:9px;border-radius:8px;background:var(--s2);border:1px solid var(--b);color:var(--m);cursor:pointer;text-align:center;font-size:12px;font-weight:500;transition:.12s}
+.mtab.on{background:var(--ac);color:#000;border-color:var(--ac)}
+#reader{border-radius:10px;overflow:hidden}
+.scan-btn{width:100%;margin-top:10px;cursor:pointer;font-family:inherit;font-weight:700;border:none;border-radius:10px;padding:12px;font-size:14px;background:var(--ac);color:#000;transition:.12s}
+.scan-btn:hover{filter:brightness(1.1)}
+.stop-btn{width:100%;margin-top:6px;cursor:pointer;font-family:inherit;font-weight:500;border:1px solid var(--b);border-radius:10px;padding:9px;font-size:13px;background:transparent;color:var(--m)}
+.manual-row{display:flex;gap:8px;margin-top:10px}
+.manual-inp{flex:1;background:var(--s2);border:1px solid var(--b);border-radius:8px;padding:9px 12px;color:var(--t);font-size:13px;font-family:inherit;outline:none}
+.manual-inp:focus{border-color:var(--ac)}
+.manual-btn{background:var(--ac);color:#000;border:none;border-radius:8px;padding:9px 14px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap}
+
+/* Result */
+.result{display:none;background:var(--s2);border-radius:14px;padding:20px;margin-bottom:12px;text-align:center}
+.result.show{display:block}
+.result.ok{border:2px solid var(--g)}
+.result.dup{border:2px solid var(--y)}
+.result.warn{border:2px solid var(--r)}
+.r-status{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px}
+.r-name{font-size:24px;font-weight:700;margin-bottom:4px}
+.r-no{color:var(--m);font-size:13px;margin-bottom:12px}
+.r-room-box{background:rgba(63,185,80,.08);border:1px solid rgba(63,185,80,.2);border-radius:10px;padding:10px;margin-bottom:10px}
+.r-room{font-size:36px;font-weight:700;color:var(--g);font-family:monospace}
+.r-teachers{font-size:13px;color:var(--ac2);margin-top:4px}
+.r-info{font-size:12px;color:var(--m);margin-top:6px;white-space:pre-line;line-height:1.6}
+.r-msg{font-size:12px;margin-top:8px;padding:8px 12px;border-radius:8px}
+.r-msg.ok{background:rgba(63,185,80,.1);color:var(--g)}
+.r-msg.warn{background:rgba(227,179,65,.1);color:var(--y)}
+.next-btn{width:100%;margin-top:12px;background:var(--s);border:1px solid var(--b);color:var(--t);border-radius:10px;padding:10px;font-size:13px;cursor:pointer;font-family:inherit}
+
+/* History */
+.hi{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:var(--s2);border-radius:8px;margin-top:6px;font-size:12px}
+.hi-room{font-weight:700;color:var(--ac2);font-size:11px}
+.hi-dup{font-size:10px;background:rgba(227,179,65,.15);color:var(--y);border-radius:4px;padding:1px 5px;margin-left:4px}
+
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--s2);border:1px solid var(--b);border-radius:12px;padding:12px 22px;font-size:14px;font-weight:600;opacity:0;transition:opacity .3s;pointer-events:none;z-index:999;white-space:nowrap}
+.toast.show{opacity:1}
+.toast.ok{border-color:var(--g);color:var(--g)}
+.toast.warn{border-color:var(--y);color:var(--y)}
+.toast.err{border-color:var(--r);color:var(--r)}
+</style>
+</head>
+<body>
+
+<div class="lw" id="LP">
+  <div class="lc">
+    <div class="ico">📱</div>
+    <h1>工作人員掃碼</h1>
+    <p>術科考場門口專用<br>請輸入您的工作人員密碼</p>
+    <input class="pw-inp" type="password" id="pw" placeholder="輸入工作人員密碼" onkeydown="if(event.key==='Enter')doLogin()">
+    <div class="err" id="err-login">密碼錯誤，請向管理員確認</div>
+    <button class="btn-login" onclick="doLogin()">登入</button>
+    <a href="index.html" style="display:block;margin-top:14px;font-size:12px;color:var(--m);text-decoration:none">← 返回管理後台</a>
+  </div>
+</div>
+
+<div id="APP" style="display:none">
+  <div id="NAV"></div>
+  <div class="wrap">
+    <div class="toprow">
+      <div>
+        <div class="room-badge"><span class="dot"></span><span id="room-label">—</span></div>
+        <div style="font-size:12px;color:var(--m);margin-top:6px" id="staff-label">—</div>
+      </div>
+      <div style="display:flex;gap:6px">
+        <button onclick="refreshCache()" style="background:transparent;border:1px solid var(--b);color:var(--m);border-radius:8px;padding:5px 12px;cursor:pointer;font-size:11px;font-family:inherit" id="refresh-btn">🔄 重整</button>
+        <button onclick="doLogout()" style="background:transparent;border:1px solid var(--b);color:var(--m);border-radius:8px;padding:5px 12px;cursor:pointer;font-size:11px;font-family:inherit">登出</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="ch2">📷 掃描考生 QR Code</div>
+      <div class="mtabs">
+        <div class="mtab on" onclick="switchMode('camera',this)">📷 鏡頭掃描</div>
+        <div class="mtab" onclick="switchMode('manual',this)">⌨️ 手動輸入</div>
+      </div>
+      <div id="mode-camera">
+        <div id="reader"></div>
+        <button class="scan-btn" id="start-btn" onclick="startScan()">▶ 開始掃描</button>
+        <button class="stop-btn" id="stop-btn" style="display:none" onclick="stopScan()">■ 停止掃描</button>
+      </div>
+      <div id="mode-manual" style="display:none">
+        <p style="font-size:12px;color:var(--m);margin-bottom:6px">輸入考生序號末三碼</p>
+        <p style="font-size:11px;color:var(--r);margin-bottom:10px">⚠️ 精確比對：輸入 002 只會找到序號末三碼為 002 的考生</p>
+        <div class="manual-row">
+          <input class="manual-inp" id="manual-regno" placeholder="例：002" maxlength="3"
+            oninput="this.value=this.value.replace(/[^0-9]/g,'')"
+            onkeydown="if(event.key==='Enter')processManualByRegNo()">
+          <button class="manual-btn" onclick="processManualByRegNo()">查詢</button>
+        </div>
+        <div id="manual-matches" style="display:none;margin-top:10px"></div>
+        <div id="manual-err" style="display:none;color:var(--r);font-size:12px;margin-top:8px;padding:8px 10px;background:rgba(248,81,73,.08);border-radius:8px"></div>
+      </div>
+    </div>
+
+    <!-- Result -->
+    <div class="result" id="result">
+      <div class="r-status" id="r-status">—</div>
+      <div class="r-name" id="r-name">—</div>
+      <div class="r-no" id="r-no">—</div>
+      <div class="r-room-box">
+        <div style="font-size:11px;color:var(--m);margin-bottom:2px">指派至教室</div>
+        <div class="r-room" id="r-room">—</div>
+        <div class="r-teachers" id="r-teachers">—</div>
+      </div>
+      <div class="r-info" id="r-info"></div>
+      <div class="r-msg" id="r-msg"></div>
+      <button class="next-btn" onclick="resetResult()">繼續掃下一位 →</button>
+    </div>
+
+    <div class="card">
+      <div class="ch2">📋 本次指派記錄</div>
+      <div id="hist"><p style="color:var(--m);font-size:12px;text-align:center;padding:12px">尚無記錄</p></div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.getElementById('nav-css').textContent = NAV_CSS;
+firebase.initializeApp(FIREBASE_CONFIG);
+const db = firebase.database();
+let myRoom = '', myName = '', scanner = null, hist = [], candidatesCache = {};
+
+function doLogin() {
+  const pw = document.getElementById('pw').value.trim();
+  document.getElementById('err-login').style.display = 'none';
+  db.ref('staff').orderByChild('password').equalTo(pw).once('value').then(snap => {
+    const data = snap.val();
+    if (!data) { document.getElementById('err-login').style.display = 'block'; return; }
+    const staff = Object.values(data)[0];
+    // CM316 是面試工作人員，不能登入術科掃碼頁
+    if (staff.room === 'CM316') {
+      const errEl = document.getElementById('err-login');
+      errEl.style.display = 'block';
+      errEl.textContent = '此帳號為面試工作人員，請使用 interview-scan.html';
+      return;
+    }
+    myRoom = staff.room;
+    myName = staff.name;
+    document.getElementById('LP').style.display = 'none';
+    document.getElementById('APP').style.display = 'block';
+    document.getElementById('NAV').innerHTML = buildNav('scan', myName, 'doLogout()');
+    document.getElementById('room-label').textContent = myRoom;
+    document.getElementById('staff-label').textContent = myName + ' 工作人員';
+    // 登入後一次性載入全量考生資料進快取
+    db.ref('candidates').once('value').then(snap => {
+      candidatesCache = snap.val() || {};
+    });
+    // 之後只監聽單筆異動（child_changed/added/removed），不推整個節點
+    db.ref('candidates').on('child_changed', snap => {
+      if (snap.key) candidatesCache[snap.key] = snap.val();
+    });
+
+    db.ref('candidates').on('child_removed', snap => {
+      if (snap.key) delete candidatesCache[snap.key];
+    });
+  }).catch(() => { document.getElementById('err-login').style.display = 'block'; });
+}
+
+function doLogout() {
+  document.getElementById('APP').style.display = 'none';
+  document.getElementById('LP').style.display = 'flex';
+  document.getElementById('pw').value = '';
+  myRoom = ''; myName = ''; hist = []; candidatesCache = {};
+  db.ref('candidates').off('child_changed');
+  db.ref('candidates').off('child_removed');
+  if (scanner) stopScan();
+}
+
+function switchMode(m, el) {
+  document.querySelectorAll('.mtab').forEach(t => t.classList.toggle('on', t === el));
+  document.getElementById('mode-camera').style.display = m === 'camera' ? 'block' : 'none';
+  document.getElementById('mode-manual').style.display = m === 'manual' ? 'block' : 'none';
+  if (m !== 'camera' && scanner) stopScan();
+}
+
+function startScan() {
+  document.getElementById('start-btn').style.display = 'none';
+  document.getElementById('stop-btn').style.display = 'block';
+  document.getElementById('reader').innerHTML = '';
+  scanner = new Html5Qrcode('reader');
+  scanner.start({ facingMode: 'environment' }, { fps: 10, qrbox: { width: 230, height: 230 } }, url => {
+    const s = scanner; scanner = null;
+    s.stop().catch(() => {}).finally(() => {
+      document.getElementById('start-btn').style.display = 'block';
+      document.getElementById('stop-btn').style.display = 'none';
+      try {
+        const id = new URL(url).searchParams.get('id');
+        if (id) processCandidate(id);
+        else alert('QR碼無效');
+      } catch (e) { alert('QR碼格式錯誤'); }
+    });
+  }, () => {});
+}
+
+function refreshCache() {
+  const btn = document.getElementById('refresh-btn');
+  if (btn) { btn.textContent = '⏳ 更新中...'; btn.disabled = true; }
+  db.ref('candidates').once('value').then(snap => {
+    candidatesCache = snap.val() || {};
+    if (btn) { btn.textContent = '✅ 已更新'; btn.disabled = false; setTimeout(() => { btn.textContent = '🔄 重整'; }, 1500); }
+  }).catch(() => {
+    if (btn) { btn.textContent = '❌ 失敗'; btn.disabled = false; setTimeout(() => { btn.textContent = '🔄 重整'; }, 1500); }
+  });
+}
+
+function stopScan() {
+  document.getElementById('start-btn').style.display = 'block';
+  document.getElementById('stop-btn').style.display = 'none';
+  if (!scanner) return Promise.resolve();
+  const s = scanner; scanner = null;
+  return s.stop().catch(() => {});
+}
+
+function processManualByRegNo() {
+  const q = document.getElementById('manual-regno').value.trim();
+  document.getElementById('manual-err').style.display = 'none';
+  document.getElementById('manual-matches').style.display = 'none';
+
+  if (!q || q.length === 0) return;
+
+  // 直接查登入時已訂閱的記憶體快取，不發送額外 Firebase 請求
+  const matched = Object.values(candidatesCache).filter(c => {
+    const reg = String(c.regNo || '');
+    return reg.length >= q.length && reg.slice(-q.length) === q;
+  });
+
+  if (matched.length === 0) {
+    const err = document.getElementById('manual-err');
+    err.textContent = `找不到序號末三碼為「${q}」的考生`;
+    err.style.display = 'block';
+    return;
+  }
+
+  if (matched.length === 1) {
+    processCandidate(matched[0].id);
+    document.getElementById('manual-regno').value = '';
+    return;
+  }
+
+  // 多筆符合時顯示選單
+  const box = document.getElementById('manual-matches');
+  box.style.display = 'block';
+  box.innerHTML = `<p style="font-size:12px;color:var(--y);margin-bottom:8px">⚠️ 找到 ${matched.length} 筆，請選擇正確考生：</p>` +
+    matched.map(c => `
+      <div onclick="processCandidate('${c.id}');document.getElementById('manual-regno').value='';document.getElementById('manual-matches').style.display='none';"
+        style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:var(--s);border:1px solid var(--b);border-radius:8px;margin-bottom:6px;cursor:pointer;transition:.12s"
+        onmouseover="this.style.borderColor='var(--ac)'" onmouseout="this.style.borderColor='var(--b)'">
+        <div>
+          <strong style="font-size:14px">${c.name}</strong>
+          <span style="color:var(--m);font-size:12px;margin-left:8px">序號 ${c.regNo}</span>
+        </div>
+        <span style="color:var(--ac);font-size:18px">›</span>
+      </div>`).join('');
+}
+
+function processCandidate(id) {
+  if (!myRoom) { alert('請先登入'); return; }
+
+  // 直接從記憶體快取取得考生資料，不發送額外 Firebase 讀取請求
+  const c = candidatesCache[id];
+  if (!c) { alert('找不到此考生，請確認QR碼正確'); return; }
+
+  const prevRoom = c.assignedRoom || null;
+
+  // 已在其他教室 → 確認後才改
+  if (prevRoom && prevRoom !== myRoom) {
+    const hasPracticalScore = c.practicalScores && Object.keys(c.practicalScores).length > 0;
+    const scoreWarning = hasPracticalScore ? '\n\n⚠️ 警告：此考生在 ' + prevRoom + ' 已有評分記錄，改派後該評分將永久刪除！' : '';
+    if (!confirm(`⚠️ 此考生（${c.name}）已指派到 ${prevRoom}。\n確定改派到 ${myRoom} 嗎？${scoreWarning}`)) return;
+    db.ref('practicalQueue/' + prevRoom + '/' + id).remove();
+    db.ref('candidates/' + id + '/practicalScores').remove();
+  }
+
+  const isDup = (prevRoom === myRoom);
+
+  // 寫入 Firebase（只寫不讀，不加 catch alert）
+  Promise.all([
+    db.ref('candidates/' + id).update({ assignedRoom: myRoom, assignedAt: Date.now() }),
+    db.ref('practicalQueue/' + myRoom + '/' + id).set({
+      candidateId: id, name: c.name, school: c.school || '',
+      dept: c.dept || '', regNo: c.regNo,
+      assignedAt: Date.now(), scannedBy: myName
+    })
+  ]).then(() => {
+    showResult(c, isDup, prevRoom);
+    hist.unshift({ name: c.name, regNo: c.regNo, time: new Date().toLocaleTimeString(), isDup });
+    if (hist.length > 10) hist.pop();
+    renderHist();
+    document.getElementById('manual-regno').value = '';
+    history.replaceState(null, '', location.pathname);
+  }).catch(() => {
+    showToast('❌ 指派失敗，請確認網路後重新掃描', 'err');
+  });
+}
+
+function showResult(c, isDup, prevRoom) {
+  const res = document.getElementById('result');
+  const teachers = Object.values(TEACHERS).filter(t => t.room === myRoom && t.type === 'practical');
+
+  res.className = 'result show ' + (isDup ? 'dup' : 'ok');
+  document.getElementById('r-status').textContent = isDup ? '⚠️ 重複掃碼' : '✅ 指派成功';
+  document.getElementById('r-status').style.color = isDup ? 'var(--y)' : 'var(--g)';
+  document.getElementById('r-name').textContent = c.name;
+  document.getElementById('r-no').textContent = '序號：' + c.regNo;
+  document.getElementById('r-room').textContent = myRoom;
+  document.getElementById('r-teachers').textContent = '👩‍🏫 ' + teachers.map(t => t.name).join('、');
+  document.getElementById('r-info').textContent =
+    (c.school ? '🏫 ' + c.school : '') + (c.dept ? '\n📚 ' + c.dept : '');
+  const msg = document.getElementById('r-msg');
+  if (isDup) {
+    msg.className = 'r-msg warn';
+    msg.textContent = '此考生已在此教室，老師畫面已更新';
+  } else {
+    msg.className = 'r-msg ok';
+    msg.textContent = '老師評分頁面已自動出現此考生';
+  }
+}
+
+function resetResult() {
+  document.getElementById('result').classList.remove('show');
+  const isCamera = document.getElementById('mode-camera').style.display !== 'none';
+  if (isCamera) {
+    stopScan().then(() => setTimeout(() => startScan(), 400));
+  }
+}
+
+function renderHist() {
+  const el = document.getElementById('hist');
+  if (!hist.length) { el.innerHTML = '<p style="color:var(--m);font-size:12px;text-align:center;padding:12px">尚無記錄</p>'; return; }
+  el.innerHTML = hist.map(h => `<div class="hi">
+    <span>
+      <strong>${h.name}</strong>
+      <span style="color:var(--m);margin-left:4px">${h.regNo}</span>
+      ${h.isDup ? '<span class="hi-dup">重複</span>' : ''}
+    </span>
+    <span>
+      <span class="hi-room">${myRoom}</span>
+      <span style="color:var(--m);font-size:10px;margin-left:6px">${h.time}</span>
+    </span>
+  </div>`).join('');
+}
+
+let _toastTimer = null;
+function showToast(msg, type) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast show ' + (type || 'ok');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => { el.className = 'toast'; }, 2500);
+}
+</script>
+<div class="toast" id="toast"></div>
+</body>
+</html>
