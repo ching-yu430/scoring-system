@@ -1,12 +1,12 @@
 // ===================== Firebase 設定 =====================
 const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyBFb3KnTBNJRk2gXYR-L8YjuL4f6H8hXl4",
-  authDomain: "interview-for-system.firebaseapp.com",
-  databaseURL: "https://interview-for-system-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "interview-for-system",
-  storageBucket: "interview-for-system.firebasestorage.app",
-  messagingSenderId: "405444605375",
-  appId: "1:405444605375:web:e112b7006732d6ab251d0a"
+  apiKey: "AIzaSyCxySBf84lIVrvVDRcPjdf1f4YxjqYmUMo",
+  authDomain: "scoring-system-c8128.firebaseapp.com",
+  databaseURL: "https://scoring-system-c8128-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "scoring-system-c8128",
+  storageBucket: "scoring-system-c8128.firebasestorage.app",
+  messagingSenderId: "593704867548",
+  appId: "1:593704867548:web:95759e7454e25280310619"
 };
 
 // ===================== 老師資料 =====================
